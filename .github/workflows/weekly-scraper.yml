@@ -1,0 +1,38 @@
+name: Weekly Slavia Stats Scraper
+
+on:
+  schedule:
+    # Každé pondělí v 7:00 ráno (po víkendových zápasech)
+    - cron: "0 7 * * 1"
+  # Umožní spustit ručně z GitHub UI
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repozitáře
+        uses: actions/checkout@v4
+
+      - name: Nastav Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Nainstaluj závislosti
+        run: |
+          pip install playwright pandas requests beautifulsoup4
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Spusť scraper
+        run: python scraper.py
+
+      - name: Commit a push nových dat
+        run: |
+          git config --global user.name "Sešívaní sobě Bot"
+          git config --global user.email "bot@sesivani-sobe.cz"
+          git add data/players.csv
+          git diff --staged --quiet || git commit -m "📊 Aktualizace dat $(date '+%Y-%m-%d')"
+          git push
