@@ -83,13 +83,29 @@ st.markdown("""
     color: var(--white) !important;
   }
 
-  /* Dataframe */
+  /* Dataframe – oprava viditelnosti */
   div[data-testid="stDataFrame"] {
     border-radius: 12px !important;
     overflow: hidden !important;
     border: 1px solid var(--border) !important;
   }
+  div[data-testid="stDataFrame"] * {
+    color: var(--white) !important;
+  }
   .dvn-scroller { background: var(--card) !important; }
+  .stDataFrame thead tr th {
+    background: var(--green) !important;
+    color: var(--white) !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    letter-spacing: 2px !important;
+  }
+  .stDataFrame tbody tr:nth-child(even) td {
+    background: rgba(10,61,43,0.3) !important;
+  }
+  .stDataFrame tbody tr:hover td {
+    background: rgba(232,0,61,0.08) !important;
+  }
 
   /* Skryj Streamlit branding */
   footer, #MainMenu, header { display: none !important; }
@@ -228,10 +244,13 @@ else:
     x_col, y_col = "xA", "assists"
     x_lbl, y_lbl = "xA — očekávané asistence", "Skutečné asistence"
 
-axis_max = max(filtered[x_col].max(), filtered[y_col].max()) * 1.2 + 0.5
+# Scatter: zobraz jen hráče s alespoň nějakou hodnotou xG nebo xA
+scatter_df = filtered[filtered[x_col] > 0.3].copy()
+
+axis_max = max(scatter_df[x_col].max(), scatter_df[y_col].max()) * 1.2 + 0.5 if not scatter_df.empty else 5
 
 colors, sizes = [], []
-for _, row in filtered.iterrows():
+for _, row in scatter_df.iterrows():
     diff = row[y_col] - row[x_col]
     colors.append("#4ade80" if diff > 0.5 else "#f87171" if diff < -0.5 else "#facc15")
     sizes.append(14)
@@ -243,14 +262,14 @@ fig.add_trace(go.Scatter(
     showlegend=False, hoverinfo="skip"
 ))
 fig.add_trace(go.Scatter(
-    x=filtered[x_col], y=filtered[y_col],
+    x=scatter_df[x_col], y=scatter_df[y_col],
     mode="markers+text",
-    text=filtered["name"].str.split().str[-1],
+    text=scatter_df["name"].str.split().str[-1],
     textposition="top center",
     textfont=dict(size=10, color="rgba(245,245,240,0.6)", family="JetBrains Mono"),
     marker=dict(size=sizes, color=colors,
                 line=dict(color="rgba(255,255,255,0.1)", width=1)),
-    customdata=filtered[["name", x_col, y_col]].values,
+    customdata=scatter_df[["name", x_col, y_col]].values,
     hovertemplate="<b>%{customdata[0]}</b><br>" +
                   f"{x_lbl}: %{{customdata[1]:.2f}}<br>" +
                   f"{y_lbl}: %{{customdata[2]}}<extra></extra>",
