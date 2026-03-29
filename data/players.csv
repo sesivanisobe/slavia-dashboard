@@ -1,27 +1,27 @@
 name,pos,goals,xG,assists,xA,mins,tmValue
 Tomáš Chorý,ÚTO,16,11.02,4,2.80,1481,3000000
 Mojmír Chytil,ÚTO,10,10.75,0,2.46,1158,4000000
-Lukáš Provod,ZÁL,6,4.40,8,6.05,1859,4500000
-Vasil Kušej,ÚTO,5,2.98,4,4.88,1291,1500000
-Štěpán Chaloupek,OBR,4,4.88,2,1.62,1507,500000
-Jan Bořil,OBR,3,1.35,1,1.79,1530,800000
-Christos Zafeiris,ZÁL,3,1.73,2,0.98,1115,2000000
-Ivan Schranz,ÚTO,2,3.06,1,0.39,625,2500000
-Lukáš Vorlický,ZÁL,2,0.81,0,0.78,237,300000
-Tomáš Holeš,OBR,1,0.85,2,1.76,1561,3000000
-Tomáš Vlček,OBR,1,0.75,1,0.51,542,400000
-Youssoupha Sanyang,ZÁL,1,1.09,0,0.17,440,500000
-Mubarak Emmanuel Suleiman,ZÁL,1,1.37,1,0.09,229,300000
-Michal Sadílek,ZÁL,1,2.17,4,4.93,1503,4000000
-David Douděra,ZÁL,1,1.32,3,2.69,1180,5000000
-David Moses,ZÁL,0,0.69,3,1.35,1110,1000000
-Murphy Dorley Oscar,ZÁL,0,0.53,1,0.80,1074,5000000
-David Jurásek,OBR,0,0.11,2,2.02,628,4000000
-Muhammed Cham,ZÁL,0,0.28,2,1.17,395,300000
-David Zima,OBR,0,0.59,2,0.56,1632,4000000
-Ondřej Zmrzlý,OBR,0,0.30,1,0.81,523,300000
-Erik Prekop,ÚTO,0,1.78,1,0.16,317,800000
-Samuel Isife,OBR,0,0.28,0,0.94,432,500000
-Igoh Ogbu,OBR,0,0.24,0,0.10,339,800000
-Daiki Hašioka,OBR,0,0.40,0,0.30,175,800000
-Youssoupha Mbodji,OBR,0,0.08,0,0.02,138,200000
+Lukáš Provod,ZÁL,6,4.40,8,6.05,1859,8000000
+Vasil Kušej,ÚTO,5,2.98,4,4.88,1291,4500000
+Štěpán Chaloupek,OBR,4,4.88,2,1.62,1507,8000000
+Jan Bořil,OBR,3,1.35,1,1.79,1530,200000
+Christos Zafeiris,ZÁL,3,1.73,2,0.98,1115,0
+Ivan Schranz,ÚTO,2,3.06,1,0.39,625,750000
+Lukáš Vorlický,ZÁL,2,0.81,0,0.78,237,0
+Tomáš Holeš,OBR,1,0.85,2,1.76,1561,1200000
+Tomáš Vlček,OBR,1,0.75,1,0.51,542,4500000
+Youssoupha Sanyang,ZÁL,1,1.09,0,0.17,440,3000000
+Mubarak Emmanuel Suleiman,ZÁL,1,1.37,1,0.09,229,1800000
+Michal Sadílek,ZÁL,1,2.17,4,4.93,1503,8000000
+David Douděra,ZÁL,1,1.32,3,2.69,1180,4000000
+David Moses,ZÁL,0,0.69,3,1.35,1110,9000000
+Murphy Dorley Oscar,ZÁL,0,0.53,1,0.80,1074,7000000
+David Jurásek,OBR,0,0.11,2,2.02,628,5000000
+Muhammed Cham,ZÁL,0,0.28,2,1.17,395,4000000
+David Zima,OBR,0,0.59,2,0.56,1632,7000000
+Ondřej Zmrzlý,OBR,0,0.30,1,0.81,523,0
+Erik Prekop,ÚTO,0,1.78,1,0.16,317,750000
+Samuel Isife,OBR,0,0.28,0,0.94,432,2000000
+Igoh Ogbu,OBR,0,0.24,0,0.10,339,7000000
+Daiki Hašioka,OBR,0,0.40,0,0.30,175,0
+Youssoupha Mbodji,OBR,0,0.08,0,0.02,138,1500000
