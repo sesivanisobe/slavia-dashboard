@@ -298,9 +298,9 @@ display_df = pd.DataFrame({
     "A–xA":       table_df["xA_diff"],
     "Minuty":     table_df["mins"],
     "TM €":       table_df["tmValue"].apply(fmt_eur),
-    "€/Gól":      table_df["eur_per_goal"].apply(lambda v: fmt_eur(v) if v else "–"),
-    "€/Asist.":   table_df["eur_per_assist"].apply(lambda v: fmt_eur(v) if v else "–"),
-    "Min/G+A":    table_df["mins_per_ga"].apply(lambda v: str(int(v)) if v else "–"),
+    "€/Gól":      table_df["eur_per_goal"].apply(lambda v: fmt_eur(v) if pd.notna(v) and v else "–"),
+    "€/Asist.":   table_df["eur_per_assist"].apply(lambda v: fmt_eur(v) if pd.notna(v) and v else "–"),
+    "Min/G+A":    table_df["mins_per_ga"].apply(lambda v: str(int(v)) if pd.notna(v) and v else "–"),
 })
 
 st.dataframe(
