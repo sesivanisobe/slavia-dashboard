@@ -314,28 +314,54 @@ sort_col = st.selectbox("SEŘADIT PODLE", [
 asc = sort_col not in ["goals", "assists", "tmValue", "xG", "xA"]
 table_df = filtered.sort_values(sort_col, ascending=asc, na_position="last")
 
-display_df = pd.DataFrame({
-    "Hráč":     table_df["name"],
-    "Pos":      table_df["pos"],
-    "G":        table_df["goals"],
-    "xG":       table_df["xG"].round(1),
-    "G–xG":     table_df["xG_diff"],
-    "A":        table_df["assists"],
-    "xA":       table_df["xA"].round(1),
-    "A–xA":     table_df["xA_diff"],
-    "Minuty":   table_df["mins"],
-    "TM €":     table_df["tmValue"].apply(fmt_eur),
-    "€/Gól":    table_df["eur_per_goal"].apply(lambda v: fmt_eur(v) if pd.notna(v) and v else "–"),
-    "€/Asist.": table_df["eur_per_assist"].apply(lambda v: fmt_eur(v) if pd.notna(v) and v else "–"),
-    "Min/G+A":  table_df["mins_per_ga"].apply(lambda v: str(int(v)) if pd.notna(v) and v else "–"),
-})
+def color_diff(val):
+    try:
+        v = float(val)
+        if v > 0:   return f'<span style="color:#4ade80;font-weight:700">+{val}</span>'
+        elif v < 0: return f'<span style="color:#f87171;font-weight:700">{val}</span>'
+        else:       return f'<span style="color:#facc15">{val}</span>'
+    except:
+        return val
 
-st.dataframe(display_df, use_container_width=True, hide_index=True,
-    column_config={
-        "G–xG": st.column_config.NumberColumn(format="%.2f"),
-        "A–xA": st.column_config.NumberColumn(format="%.2f"),
-    }
-)
+rows_html = ""
+for _, row in table_df.iterrows():
+    rows_html += f"""
+    <tr>
+      <td style="font-weight:600;color:#F5F5F0">{row['name']}</td>
+      <td style="color:#4A7A60;font-family:monospace">{row['pos']}</td>
+      <td style="color:#F5F5F0;font-weight:700">{row['goals']}</td>
+      <td style="color:#888">{row['xG']:.1f}</td>
+      <td>{color_diff(f"{row['xG_diff']:.2f}")}</td>
+      <td style="color:#F5F5F0;font-weight:700">{row['assists']}</td>
+      <td style="color:#888">{row['xA']:.1f}</td>
+      <td>{color_diff(f"{row['xA_diff']:.2f}")}</td>
+      <td style="color:#888">{row['mins']}</td>
+      <td style="color:#E8003D">{fmt_eur(row['tmValue'])}</td>
+      <td style="color:#F5F5F0">{fmt_eur(row['eur_per_goal']) if pd.notna(row['eur_per_goal']) and row['eur_per_goal'] else '–'}</td>
+      <td style="color:#F5F5F0">{fmt_eur(row['eur_per_assist']) if pd.notna(row['eur_per_assist']) and row['eur_per_assist'] else '–'}</td>
+      <td style="color:#F5F5F0">{str(int(row['mins_per_ga'])) if pd.notna(row['mins_per_ga']) and row['mins_per_ga'] else '–'}</td>
+    </tr>"""
+
+st.markdown(f"""
+<div style="overflow-x:auto;border-radius:12px;border:1px solid #1A3025;">
+<table style="width:100%;border-collapse:collapse;font-size:13px;font-family:'Inter',sans-serif;">
+  <thead>
+    <tr style="background:#0A3D2B;border-bottom:1px solid #1A3025;">
+      {''.join(f'<th style="padding:10px 12px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:2px;color:#4A7A60;white-space:nowrap">{c}</th>'
+               for c in ["HRÁČ","POS","G","xG","G–xG","A","xA","A–xA","MIN","TM €","€/G","€/A","MIN/G+A"])}
+    </tr>
+  </thead>
+  <tbody>
+    {rows_html}
+  </tbody>
+</table>
+</div>
+<style>
+  table tr:nth-child(even) {{ background: rgba(10,61,43,0.2); }}
+  table tr:hover {{ background: rgba(232,0,61,0.06) !important; }}
+  table td {{ padding: 9px 12px; border-bottom: 1px solid #0D1A12; white-space:nowrap; }}
+</style>
+""", unsafe_allow_html=True)
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 csv_path = Path("data/players.csv")
