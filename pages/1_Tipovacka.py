@@ -9,10 +9,23 @@ Identifikace uživatele: přes URL parametry ?u=jmeno&t=token
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import gspread
 from google.oauth2.service_account import Credentials
 
 from scoring import Tip, Vysledek, spocitej_body
+
+CASOVA_ZONA = ZoneInfo("Europe/Prague")
+
+
+def ted_praha() -> datetime:
+    """
+    Aktuální čas v pražské časové zóně - BEZ ohledu na to, v jaké časové zóně
+    běží server appky (Streamlit Cloud běží v UTC). Vrací naivní datetime
+    (bez tzinfo), ať se dá přímo porovnávat s deadliny zadanými ručně
+    v Google Sheets (ty jsou taky bez časové zóny, v pražském čase).
+    """
+    return datetime.now(CASOVA_ZONA).replace(tzinfo=None)
 
 
 def cz(hodnota, desetiny=2) -> str:
@@ -98,7 +111,7 @@ def uloz_tip(zapas_id, jmeno, skore_domaci, skore_hoste, tip_xg):
     ws = sheet.worksheet("tipy")
     ws.append_row([
         str(zapas_id), jmeno, int(skore_domaci), int(skore_hoste), float(tip_xg),
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        ted_praha().strftime("%Y-%m-%d %H:%M:%S"),
     ])
 
 
@@ -152,7 +165,7 @@ if zapasy_df.empty or "deadline" not in zapasy_df.columns:
     )
     st.stop()
 
-ted = datetime.now()
+ted = ted_praha()
 
 
 def over_datum(hodnota):
