@@ -104,6 +104,7 @@ def ziskej_sheet():
     return klient.open_by_url(st.secrets["tipovacka"]["sheet_url"])
 
 
+@st.cache_data(ttl=30)
 def nacti_list(nazev_listu: str) -> pd.DataFrame:
     sheet = ziskej_sheet()
     ws = sheet.worksheet(nazev_listu)
@@ -228,7 +229,7 @@ with tab_tip:
 
                 if st.button("Odeslat tip", key=f"submit_{zapas['zapas_id']}", type="primary"):
                     uloz_tip(zapas["zapas_id"], zobrazovane_jmeno, skore_d, skore_h, tip_xg)
-                    st.cache_resource.clear()
+                    st.cache_data.clear()
                     st.toast(random.choice(HLASKY_PO_ULOZENI), icon="✅")
                     st.rerun()
 
