@@ -80,7 +80,10 @@ def ziskej_sheet():
 def nacti_list(nazev_listu: str) -> pd.DataFrame:
     sheet = ziskej_sheet()
     ws = sheet.worksheet(nazev_listu)
-    data = ws.get_all_records()
+    # value_render_option="UNFORMATTED_VALUE" - bereme skutečnou hodnotu buňky,
+    # ne tu zobrazenou podle lokalizace sheetu (jinak gspread plete českou desetinnou
+    # čárku s americkým oddělovačem tisíců, např. "4,25" -> 425)
+    data = ws.get_all_records(value_render_option="UNFORMATTED_VALUE")
     return pd.DataFrame(data)
 
 
@@ -136,8 +139,27 @@ zapasy_df = nacti_list("zapasy")
 tipy_df = nacti_list("tipy")
 vysledky_df = nacti_list("vysledky")
 
+if zapasy_df.empty or "deadline" not in zapasy_df.columns:
+    st.warning(
+        "V listu 'zapasy' zatím nejsou žádné zápasy k tipování (nebo chybí sloupec "
+        "'deadline'). Přidej zápasy do Google Sheets a stránku obnov."
+    )
+    st.stop()
+
 ted = datetime.now()
-zapasy_df["deadline_dt"] = pd.to_datetime(zapasy_df["deadline"])
+
+
+def over_datum(hodnota):
+    """
+    Zvládne datum zadané jako text ('2026-07-25 17:00') i jako syrové sériové
+    číslo Google Sheets (pokud si Sheets text sám převedl na interní datum).
+    """
+    if isinstance(hodnota, (int, float)):
+        return pd.to_datetime("1899-12-30") + pd.to_timedelta(hodnota, unit="D")
+    return pd.to_datetime(hodnota)
+
+
+zapasy_df["deadline_dt"] = zapasy_df["deadline"].apply(over_datum)
 otevrene = zapasy_df[zapasy_df["deadline_dt"] > ted].copy()
 
 moje_tipy = tipy_df[tipy_df["jmeno"] == zobrazovane_jmeno] if not tipy_df.empty else pd.DataFrame()
