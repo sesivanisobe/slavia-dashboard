@@ -77,18 +77,21 @@ def safe_str(val):
     return str(int(val))
 
 
+SEZONY = {
+    "2026/27": "data/players_2026_27.csv",
+    "2025/26": "data/players_2025_26.csv",
+}
+
+
 @st.cache_data(ttl=1800)
-def load_data():
-    csv_path = Path("data/players.csv")
+def load_data(sezona: str):
+    csv_path = Path(SEZONY[sezona])
     if csv_path.exists():
         df = pd.read_csv(csv_path)
     else:
+        # Nouzový fallback, kdyby soubor chyběl úplně (jen pár ukázkových řádků)
         df = pd.DataFrame([
-            {"name": "Tomáš Chorý",      "pos": "ÚTO", "goals": 16, "xG": 11.02, "assists": 4,  "xA": 2.80, "mins": 1481, "tmValue": 3000000},
-            {"name": "Mojmír Chytil",    "pos": "ÚTO", "goals": 10, "xG": 10.75, "assists": 0,  "xA": 2.46, "mins": 1158, "tmValue": 4000000},
-            {"name": "Lukáš Provod",     "pos": "ZÁL", "goals": 6,  "xG": 4.40,  "assists": 8,  "xA": 6.05, "mins": 1859, "tmValue": 8000000},
-            {"name": "Štěpán Chaloupek", "pos": "OBR", "goals": 4,  "xG": 4.88,  "assists": 2,  "xA": 1.62, "mins": 1507, "tmValue": 8000000},
-            {"name": "Michal Sadílek",   "pos": "ZÁL", "goals": 1,  "xG": 2.17,  "assists": 4,  "xA": 4.93, "mins": 1503, "tmValue": 8000000},
+            {"name": "Tomáš Chorý", "pos": "ÚTO", "goals": 0, "xG": 0.0, "assists": 0, "xA": 0.0, "mins": 0, "tmValue": 3000000},
         ])
 
     df["xG_diff"]         = (df["goals"]   - df["xG"]).round(2)
@@ -100,7 +103,10 @@ def load_data():
     return df
 
 
-df = load_data()
+_, sezona_col = st.columns([4, 1])
+with sezona_col:
+    vybrana_sezona = st.selectbox("SEZÓNA", list(SEZONY.keys()), key="sezona_select")
+df = load_data(vybrana_sezona)
 
 # ── HEADER ───────────────────────────────────────────────────────────────────
 st.markdown(
@@ -126,12 +132,13 @@ st.markdown(
     '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);'
     'letter-spacing:3px;">FORTUNA:LIGA</div>'
     '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);'
-    'letter-spacing:3px;">SEZÓNA 2025/26</div>'
+    f'letter-spacing:3px;">SEZÓNA {vybrana_sezona}</div>'
     '<div style="font-family:monospace;font-size:10px;color:#E8003D;'
     'letter-spacing:3px;">xG · xA · HODNOTA</div>'
     '</div></div>',
     unsafe_allow_html=True
 )
+
 
 # ── FILTRY ────────────────────────────────────────────────────────────────────
 fc1, fc2, fc3 = st.columns([1, 1, 2])
@@ -314,7 +321,7 @@ table_html = (
 st.markdown(table_html, unsafe_allow_html=True)
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
-csv_path = Path("data/players.csv")
+csv_path = Path(SEZONY[vybrana_sezona])
 updated = ""
 if csv_path.exists():
     mtime = csv_path.stat().st_mtime
