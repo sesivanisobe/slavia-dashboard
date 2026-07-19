@@ -8,6 +8,7 @@ Identifikace uživatele: přes URL parametry ?u=jmeno&t=token
 
 import streamlit as st
 import pandas as pd
+import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import gspread
@@ -16,6 +17,13 @@ from google.oauth2.service_account import Credentials
 from scoring import Tip, Vysledek, spocitej_body
 
 CASOVA_ZONA = ZoneInfo("Europe/Prague")
+
+HLASKY_PO_ULOZENI = [
+    "Díky za tip, Slávisto! ✌️",
+    "Skvělý tip, ať vyjde! 💪",
+    "Tip jsme uložili, ať žije Slavia! ❤️🤍",
+    "To nemá kam! 👍",
+]
 
 
 def ted_praha() -> datetime:
@@ -221,7 +229,7 @@ with tab_tip:
                 if st.button("Odeslat tip", key=f"submit_{zapas['zapas_id']}", type="primary"):
                     uloz_tip(zapas["zapas_id"], zobrazovane_jmeno, skore_d, skore_h, tip_xg)
                     st.cache_resource.clear()
-                    st.success("Tip uložen!")
+                    st.toast(random.choice(HLASKY_PO_ULOZENI), icon="✅")
                     st.rerun()
 
 # ── TAB: MOJE TIPY ────────────────────────────────────────────────────────
