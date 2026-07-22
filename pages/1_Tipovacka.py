@@ -201,7 +201,7 @@ otevrene = zapasy_df[zapasy_df["deadline_dt"] > ted].copy()
 moje_tipy = tipy_df[tipy_df["jmeno"] == zobrazovane_jmeno] if not tipy_df.empty else pd.DataFrame()
 jiz_tipovane_id = set(moje_tipy["zapas_id"].astype(str)) if not moje_tipy.empty else set()
 
-tab_tip, tab_moje, tab_zebricek = st.tabs(["📝 TIPNOUT", "📋 MOJE TIPY", "🏆 ŽEBŘÍČEK"])
+tab_tip, tab_moje, tab_zebricek, tab_pravidla = st.tabs(["📝 TIPNOUT", "📋 MOJE TIPY", "🏆 ŽEBŘÍČEK", "📖 PRAVIDLA"])
 
 # ── TAB: TIPNOUT ──────────────────────────────────────────────────────────
 with tab_tip:
@@ -285,19 +285,110 @@ with tab_zebricek:
             odehrano=("body", "count"),
             presnych_vysledku=("presny_vysledek", "sum"),
         ).reset_index()
-        souhrn["prumer_na_zapas"] = (souhrn["celkem_bodu"] / souhrn["odehrano"]).round(1).apply(lambda x: cz(x, 1))
-        souhrn = souhrn.sort_values(
+        souhrn["prumer_num"] = (souhrn["celkem_bodu"] / souhrn["odehrano"]).round(2)
+        souhrn["prumer_na_zapas"] = souhrn["prumer_num"].apply(lambda x: cz(x, 1))
+
+        # ── Žebříček č. 1: podle celkových bodů ─────────────────────────
+        st.markdown("#### 🏆 Podle celkových bodů")
+        tabulka_celkem = souhrn.sort_values(
             ["celkem_bodu", "presnych_vysledku"], ascending=[False, False]
         ).reset_index(drop=True)
-        souhrn.index = souhrn.index + 1
+        tabulka_celkem.index = tabulka_celkem.index + 1
 
         st.dataframe(
-            souhrn.rename(columns={
+            tabulka_celkem[["jmeno", "celkem_bodu", "odehrano", "presnych_vysledku", "prumer_na_zapas"]].rename(columns={
                 "jmeno": "Jméno", "celkem_bodu": "Body celkem", "odehrano": "Odehráno zápasů",
                 "presnych_vysledku": "Přesných výsledků", "prumer_na_zapas": "Průměr / zápas",
             }),
             use_container_width=True,
         )
+
+        # ── Žebříček č. 2: podle průměru na zápas (s minimem odehraných tipů) ──
+        MIN_ZAPASU_PRO_PRUMER = 15  # polovina základní části ligy bez nadstavby
+
+        st.markdown("#### 📊 Podle průměru bodů na zápas")
+        st.caption(
+            f"Zohledňuje, že ne každý stihl tipnout každé kolo. "
+            f"Do tohoto žebříčku se počítají jen ti, kdo mají alespoň {MIN_ZAPASU_PRO_PRUMER} odehrané tipy "
+            f"(ať jednomu tipu se šťastnou náhodou nevyhraje celá soutěž)."
+        )
+
+        zpusobili = souhrn[souhrn["odehrano"] >= MIN_ZAPASU_PRO_PRUMER]
+
+        if zpusobili.empty:
+            st.info(f"Zatím nikdo neodehrál alespoň {MIN_ZAPASU_PRO_PRUMER} tipů.")
+        else:
+            tabulka_prumer = zpusobili.sort_values(
+                ["prumer_num", "odehrano"], ascending=[False, False]
+            ).reset_index(drop=True)
+            tabulka_prumer.index = tabulka_prumer.index + 1
+
+            st.dataframe(
+                tabulka_prumer[["jmeno", "prumer_na_zapas", "odehrano", "celkem_bodu", "presnych_vysledku"]].rename(columns={
+                    "jmeno": "Jméno", "prumer_na_zapas": "Průměr / zápas", "odehrano": "Odehráno zápasů",
+                    "celkem_bodu": "Body celkem", "presnych_vysledku": "Přesných výsledků",
+                }),
+                use_container_width=True,
+            )
+
+
+# ── TAB: PRAVIDLA ─────────────────────────────────────────────────────────
+with tab_pravidla:
+    st.markdown(
+        """
+### Jak se tipuje
+
+Ke každému zápasu tipneš dvě věci:
+- **výsledek** (skóre domácí:hosté)
+- **xG Slavie** (očekávané góly, na dvě desetinná místa)
+
+Tip musíš odeslat před uzávěrkou (výkopem zápasu) — po uzávěrce se zápas z nabídky ztratí.
+
+### Jak se počítají body
+
+**Za výsledek — max 100 bodů**
+- Přesně trefené skóre → **100 bodů**
+- Cokoliv jiného (i správný vítěz, jen jiné skóre) → **0 bodů**
+
+**Za xG — max 100 bodů**
+Body se počítají podle vzorce:
+
+> `100 − (odchylka × 100)`, minimálně 0
+
+kde odchylka je rozdíl mezi tvým tipem a skutečným xG. Čím blíž trefíš, tím víc bodů:
+
+| Odchylka od skutečného xG | Body za xG |
+|---|---|
+| 0,00 | 100 |
+| 0,10 | 90 |
+| 0,25 | 75 |
+| 0,50 | 50 |
+| 0,75 | 25 |
+| 1,00 a víc | 0 (nikdy záporně) |
+
+**Obě vrstvy se sčítají nezávisle** — i když netrefíš přesné skóre, pořád můžeš získat plný počet bodů za dobře odhadnuté xG, a naopak.
+
+**Maximum za jeden zápas: 200 bodů** (100 za výsledek + 100 za xG).
+
+### Příklad
+
+Slavia vyhraje 3:0, skutečné xG bylo 3,5.
+
+| Tvůj tip | Body za výsledek | Odchylka xG | Body za xG | Celkem |
+|---|---|---|---|---|
+| 3:0, xG 3,5 | 100 | 0,00 | 100 | **200** |
+| 3:0, xG 3,8 | 100 | 0,30 | 70 | **170** |
+| 2:0, xG 3,5 | 0 | 0,00 | 100 | **100** |
+| 1:0, xG 1,0 | 0 | 2,50 | 0 | **0** |
+
+### Sezónní žebříček
+
+Hodnotí se ve **dvou žebříčcích** zároveň:
+
+1. **Podle celkových bodů** — prostý součet za celou sezónu. V případě shody bodů rozhoduje počet přesně trefených výsledků.
+2. **Podle průměru bodů na zápas** — zohledňuje, že ne každý stihne otipovat úplně každé kolo (dovolená, výpadek internetu apod.). Aby v tomhle žebříčku nemohl vyhrát někdo jen díky jednomu šťastnému tipu, počítají se do něj jen ti, kdo mají odtipováno **alespoň 15 zápasů** (polovina základní části ligy bez nadstavby).
+        """
+    )
 
 st.markdown(
     "<div style='text-align:center;margin-top:48px;padding:20px 0;border-top:1px solid #1A3025;'>"
