@@ -7,6 +7,7 @@ Identifikace uživatele: přes URL parametry ?u=jmeno&t=token
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import random
 from datetime import datetime
@@ -144,6 +145,30 @@ st.markdown(
     '</div>',
     unsafe_allow_html=True,
 )
+
+# ── BMC tlačítko "Podpořit nás" ──────────────────────────────────────────────
+# Vložené jako normální blok v těle stránky (ne plovoucí přes celou obrazovku) -
+# nejbezpečnější varianta, protože zabírá jen svůj vlastní prostor a nemůže nic
+# překrýt (záložky, tlačítka apod.). Bublina se zprávou se automaticky ukáže
+# při načtení stránky, pak se sbalí do kolečka vpravo dole - to je vlastnost
+# samotného BMC skriptu, nejde to ovlivnit zvenčí.
+components.html(
+    """
+    <script data-name="BMC-Widget" data-cfasync="false"
+      src="https://cdnjs.buymeacoffee.com/1.0.0/widget.prod.min.js"
+      data-id="sesivanisobe"
+      data-description="Support me on Buy me a coffee!"
+      data-message="Podpořit nás můžete zde:"
+      data-color="#E8003D"
+      data-position="Right"
+      data-x_margin="18"
+      data-y_margin="18">
+    </script>
+    """,
+    height=100,
+)
+
+
 
 if not jmeno or not token:
     st.error(
