@@ -82,23 +82,6 @@ st.markdown("""
     font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important;
     letter-spacing: 2px !important;
   }
-  /* Šipky pro posouvání záložek na mobilu (když se nevejdou na šířku) -
-     cílíme na jakékoliv tlačítko uvnitř .stTabs, které NENÍ samotná záložka
-     (zkoušíme dvě různé možné varianty značení, ať to má šanci trefit) */
-  .stTabs button:not([data-baseweb="tab"]):not([role="tab"]) {
-    background-color: #0D1A12 !important;
-    border: 1px solid #1A3025 !important;
-    border-radius: 6px !important;
-    box-shadow: none !important;
-  }
-  .stTabs button:not([data-baseweb="tab"]):not([role="tab"]) svg {
-    fill: #E8003D !important;
-    color: #E8003D !important;
-  }
-  .stTabs button:not([data-baseweb="tab"]):not([role="tab"]) svg path {
-    fill: #E8003D !important;
-    stroke: #E8003D !important;
-  }
   .stNumberInput label {
     color: #4A7A60 !important; font-family: 'JetBrains Mono', monospace !important;
     font-size: 11px !important; letter-spacing: 2px !important;
