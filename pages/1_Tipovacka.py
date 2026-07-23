@@ -82,6 +82,17 @@ st.markdown("""
     font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important;
     letter-spacing: 2px !important;
   }
+  /* Šipky pro posouvání záložek na mobilu - přesný selektor ověřený inspekcí
+     v prohlížeči (data-testid="stTabsScrollRight" / "stTabsScrollLeft") */
+  [data-testid="stTabsScrollRight"], [data-testid="stTabsScrollLeft"] {
+    background-color: #0D1A12 !important;
+    border: 1px solid #1A3025 !important;
+    border-radius: 6px !important;
+  }
+  [data-testid="stTabsScrollRight"] svg, [data-testid="stTabsScrollLeft"] svg {
+    fill: #E8003D !important;
+    color: #E8003D !important;
+  }
   .stNumberInput label {
     color: #4A7A60 !important; font-family: 'JetBrains Mono', monospace !important;
     font-size: 11px !important; letter-spacing: 2px !important;
