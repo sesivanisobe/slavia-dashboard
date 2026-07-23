@@ -147,11 +147,33 @@ st.markdown(
 )
 
 # ── BMC tlačítko "Podpořit nás" ──────────────────────────────────────────────
-# Vložené jako normální blok v těle stránky (ne plovoucí přes celou obrazovku) -
-# nejbezpečnější varianta, protože zabírá jen svůj vlastní prostor a nemůže nic
-# překrýt (záložky, tlačítka apod.). Bublina se zprávou se automaticky ukáže
-# při načtení stránky, pak se sbalí do kolečka vpravo dole - to je vlastnost
-# samotného BMC skriptu, nejde to ovlivnit zvenčí.
+# Plovoucí widget v pravém dolním rohu obrazovky. Vyhrazený prostor je dost
+# velký na celý rozbalený formulář (ne jen sbalené kolečko) - jinak by se
+# rozbalený obsah neviditelně ořízl. POZOR: tahle plocha (i když je vizuálně
+# prázdná) blokuje kliknutí na cokoliv pod ní - na mobilu, kde je displej užší,
+# to může zabrat velkou část obrazovky. Pokud to bude vadit, dá se to jen
+# zmenšit (BMC_SIRKA_PX, BMC_VYSKA_PX) nebo úplně nahradit jednoduchým
+# odkazem na buymeacoffee.com/sesivanisobe.
+BMC_SIRKA_PX = 320
+BMC_VYSKA_PX = 460
+
+st.markdown(
+    f"""
+    <style>
+    iframe {{
+        position: fixed !important;
+        bottom: 0px !important;
+        right: 0px !important;
+        width: {BMC_SIRKA_PX}px !important;
+        height: {BMC_VYSKA_PX}px !important;
+        border: none !important;
+        z-index: 9999 !important;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 components.html(
     """
     <script data-name="BMC-Widget" data-cfasync="false"
@@ -165,8 +187,10 @@ components.html(
       data-y_margin="18">
     </script>
     """,
-    height=100,
+    height=BMC_VYSKA_PX,
+    width=BMC_SIRKA_PX,
 )
+
 
 
 
