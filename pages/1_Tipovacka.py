@@ -172,9 +172,9 @@ st.markdown(
     @media (max-width: 600px) {{
         iframe {{
             right: 10px !important;
-            bottom: 90px !important;
-            width: 260px !important;
-            height: 380px !important;
+            bottom: 20px !important;
+            width: 80px !important;
+            height: 80px !important;
         }}
     }}
     </style>
