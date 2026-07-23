@@ -163,7 +163,7 @@ st.markdown(
     iframe {{
         position: fixed !important;
         bottom: 100px !important;
-        right: 0px !important;
+        right: 100px !important;
         width: {BMC_SIRKA_PX}px !important;
         height: {BMC_VYSKA_PX}px !important;
         border: none !important;
