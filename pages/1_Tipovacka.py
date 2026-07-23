@@ -187,8 +187,8 @@ components.html(
       data-y_margin="18">
     </script>
     """,
-    height=BMC_VYSKA_PX,
-    width=BMC_SIRKA_PX,
+    height=1,
+    width=1,
 )
 
 
