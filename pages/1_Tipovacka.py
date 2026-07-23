@@ -169,6 +169,14 @@ st.markdown(
         border: none !important;
         z-index: 9999 !important;
     }}
+    @media (max-width: 600px) {{
+        iframe {{
+            right: 10px !important;
+            bottom: 90px !important;
+            width: 260px !important;
+            height: 380px !important;
+        }}
+    }}
     </style>
     """,
     unsafe_allow_html=True,
