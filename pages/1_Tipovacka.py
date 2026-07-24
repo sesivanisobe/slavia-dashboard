@@ -88,14 +88,31 @@ st.markdown("""
     background-color: #0D1A12 !important;
     border: 1px solid #1A3025 !important;
     border-radius: 6px !important;
+    box-shadow: none !important;
+    color-scheme: dark !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
   }
   [data-testid="stTabsScrollRight"] svg, [data-testid="stTabsScrollLeft"] svg {
     fill: #E8003D !important;
     color: #E8003D !important;
   }
+  /* Bílé "vyblednutí" okraje je často přes ::before/::after pseudo-element
+     na nadřazeném kontejneru se seznamem záložek - zkoušíme to potlačit i tady */
+  [data-orientation="horizontal"]::before,
+  [data-orientation="horizontal"]::after {
+    background: transparent !important;
+    box-shadow: none !important;
+    content: none !important;
+  }
   .stNumberInput label {
     color: #4A7A60 !important; font-family: 'JetBrains Mono', monospace !important;
     font-size: 11px !important; letter-spacing: 2px !important;
+  }
+  /* "Sešívaný" okraj karet zápasů (Tipnout / Moje tipy) */
+  [data-testid="stVerticalBlockBorderWrapper"] {
+    border: 2px dashed #2A4A38 !important;
+    border-radius: 14px !important;
   }
   footer, #MainMenu, header { display: none !important; }
   .stDeployButton { display: none !important; }
@@ -145,15 +162,20 @@ jmeno = query_params.get("u", "")
 token = query_params.get("t", "")
 
 st.markdown(
+    '<div style="background:linear-gradient(135deg,#0A3D2B 0%,#0F5C3F 45%,#051A10 100%);'
+    'margin:0 -1rem;padding:24px 44px 28px;border-bottom:3px solid #E8003D;">'
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
     '<div>'
     '<div style="font-family:monospace;font-size:10px;letter-spacing:5px;'
-    'color:rgba(255,255,255,0.4);margin:24px 0 4px;">SEŠÍVANÍ SOBĚ</div>'
+    'color:rgba(255,255,255,0.5);margin:0 0 4px;">SEŠÍVANÍ SOBĚ</div>'
     '<div style="font-size:36px;font-weight:800;color:white;line-height:1.1;'
-    'letter-spacing:2px;margin-bottom:24px;">SKS Tipovačka 2026/27</div>'
+    'letter-spacing:2px;">SKS Tipovačka 2026/2027</div>'
+    '<div style="font-family:monospace;font-size:12px;letter-spacing:2.5px;'
+    'color:rgba(255,255,255,0.55);margin-top:10px;">CHANCE LIGA · MOL CUP · LIGA MISTRŮ</div>'
     '</div>'
     f'<img src="data:image/png;base64,{LOGO_BASE64}" '
-    'style="height:72px;width:auto;margin-top:20px;" alt="Sešívaní sobě" />'
+    'style="height:72px;width:auto;margin-top:4px;" alt="Sešívaní sobě" />'
+    '</div>'
     '</div>',
     unsafe_allow_html=True,
 )
