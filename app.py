@@ -1,177 +1,338 @@
-#!/usr/bin/env python3
 """
-update_players.py — aktualizace statistik hráčů + sběr historie po kolech.
-
-Co dělá:
-  1. Načte přes Playwright kumulativní hráčskou statistiku Slavie z chanceliga.cz.
-  2. Zapíše data/players_2026_27.csv — AKTUÁLNÍ stav (pro stávající dashboard).
-  3. Přidá snapshot do data/history_2026_27.csv — jeden řádek na hráče a KOLO
-     (kumulativní hodnoty). Z historie se pak dá vykreslit:
-       - náběhová křivka  = kumulativní hodnota vs. kolo (přímo, bez odečítání)
-       - příspěvek za kolo = hodnota[kolo] - hodnota[kolo-1]
-     Ukládáme kumulativně schválně: když zdroj zpětně opraví číslo (Provod!),
-     rozdíly se dopočítají čistě a nic se nerozbije.
-
-Spuštění:
-  pip install playwright && playwright install chromium
-  python3 update_players.py                 # kolo se odhadne z počtu odehraných zápasů
-  python3 update_players.py --round 3       # kolo zadáš ručně (spolehlivější)
-
-Idempotentní: opětovné spuštění pro stejné kolo řádky přepíše, nezduplikuje.
+Sešívaní sobě – SK Slavia Praha Dashboard
 """
 
-import argparse, csv, sys
+import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 from pathlib import Path
-from playwright.sync_api import sync_playwright
+from datetime import datetime
 
-CLUB_ID = 5
-CSV_PATH = Path("data/players_2026_27.csv")
-HIST_PATH = Path("data/history_2026_27.csv")
+st.set_page_config(
+    page_title="Sešívaní sobě | Slavia Dashboard",
+    page_icon="🔴",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-POS_MAP = {
-    "B": None, "brankar": None, "GK": None,
-    "O": "OBR", "obrance": "OBR",
-    "Z": "ZAL", "zaloznik": "ZAL",
-    "U": "UTO", "utocnik": "UTO",
+st.markdown("""
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  html, body, [class*="css"], .stApp {
+    background-color: #060C08 !important;
+    color: #F5F5F0 !important;
+    font-family: 'Inter', sans-serif !important;
+  }
+  .main { background-color: #060C08 !important; }
+  .block-container {
+    background-color: #060C08 !important;
+    padding: 0 2rem 4rem !important;
+    max-width: 1200px !important;
+    margin: 0 auto !important;
+  }
+  h1,h2,h3 {
+    font-family: 'Bebas Neue', sans-serif !important;
+    letter-spacing: 2px !important;
+    color: #F5F5F0 !important;
+  }
+  div[data-testid="metric-container"] {
+    background: #0D1A12 !important;
+    border: 1px solid #1A3025 !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+  }
+  div[data-testid="metric-container"] label {
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 10px !important;
+    letter-spacing: 3px !important;
+    color: #4A7A60 !important;
+    text-transform: uppercase !important;
+  }
+  .stSelectbox label, .stRadio label {
+    color: #4A7A60 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px !important;
+    letter-spacing: 2px !important;
+  }
+  footer, #MainMenu, header { display: none !important; }
+  .stDeployButton { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
+
+def fmt_eur(val):
+    if val is None or pd.isna(val) or val == 0:
+        return "–"
+    if val >= 1_000_000:
+        return "€" + str(round(val / 1_000_000, 1)) + "M"
+    if val >= 1_000:
+        return "€" + str(int(val / 1_000)) + "K"
+    return "€" + str(int(val))
+
+
+def safe_str(val):
+    if val is None or pd.isna(val):
+        return "–"
+    return str(int(val))
+
+
+SEZONY = {
+    "2026/27": "data/players_2026_27.csv",
+    "2025/26": "data/players_2025_26.csv",
 }
-# pozn.: hodnoty se nastaví na skutečné diakritické varianty níže
-POS_MAP = {
-    "B": None, "brankář": None, "brankar": None, "GK": None,
-    "O": "OBR", "obránce": "OBR", "obrance": "OBR",
-    "Z": "ZÁL", "záložník": "ZÁL", "zaloznik": "ZÁL",
-    "U": "ÚTO", "útočník": "ÚTO", "utocnik": "ÚTO",
+
+
+@st.cache_data(ttl=1800)
+def load_data(sezona: str):
+    csv_path = Path(SEZONY[sezona])
+    if csv_path.exists():
+        df = pd.read_csv(csv_path)
+    else:
+        # Nouzový fallback, kdyby soubor chyběl úplně (jen pár ukázkových řádků)
+        df = pd.DataFrame([
+            {"name": "Tomáš Chorý", "pos": "ÚTO", "goals": 0, "xG": 0.0, "assists": 0, "xA": 0.0, "mins": 0, "tmValue": 3000000},
+        ])
+
+    df["xG_diff"]         = (df["goals"]   - df["xG"]).round(2)
+    df["xA_diff"]         = (df["assists"] - df["xA"]).round(2)
+    df["eur_per_goal"]    = df.apply(lambda r: round(r.tmValue / r.goals)   if r.goals   > 0 and r.tmValue > 0 else None, axis=1)
+    df["eur_per_assist"]  = df.apply(lambda r: round(r.tmValue / r.assists) if r.assists > 0 and r.tmValue > 0 else None, axis=1)
+    df["eur_per_ga"]      = df.apply(lambda r: round(r.tmValue / (r.goals + r.assists)) if (r.goals + r.assists) > 0 and r.tmValue > 0 else None, axis=1)
+    df["mins_per_ga"]     = df.apply(lambda r: round(r.mins / (r.goals + r.assists)) if (r.goals + r.assists) > 0 else None, axis=1)
+    return df
+
+
+_, sezona_col = st.columns([4, 1])
+with sezona_col:
+    vybrana_sezona = st.selectbox("SEZÓNA", list(SEZONY.keys()), key="sezona_select")
+df = load_data(vybrana_sezona)
+
+# ── HEADER ───────────────────────────────────────────────────────────────────
+st.markdown(
+    '<div style="background:linear-gradient(135deg,#0A3D2B 0%,#0F5C3F 40%,#051A10 100%);'
+    'padding:40px 40px 32px;margin-bottom:32px;position:relative;overflow:hidden;'
+    'border-bottom:2px solid #E8003D;">'
+    '<div style="position:absolute;right:40px;top:50%;transform:translateY(-50%);'
+    'font-family:serif;font-size:140px;color:rgba(255,255,255,0.04);line-height:1;'
+    'user-select:none;">SKS</div>'
+    '<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;">'
+    '<div style="width:52px;height:52px;border-radius:50%;'
+    'background:linear-gradient(135deg,#E8003D,#9B0028);'
+    'display:flex;align-items:center;justify-content:center;'
+    'font-size:24px;color:white;font-weight:800;'
+    'border:2px solid rgba(255,255,255,0.15);">S</div>'
+    '<div>'
+    '<div style="font-family:monospace;font-size:10px;letter-spacing:5px;'
+    'color:rgba(255,255,255,0.4);margin-bottom:4px;">SEŠÍVANÍ SOBĚ · SK SLAVIA PRAHA</div>'
+    '<div style="font-size:36px;font-weight:800;color:white;line-height:1;'
+    'letter-spacing:2px;">Analytický dashboard</div>'
+    '</div></div>'
+    '<div style="display:flex;gap:24px;margin-top:8px;">'
+    '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);'
+    'letter-spacing:3px;">FORTUNA:LIGA</div>'
+    '<div style="font-family:monospace;font-size:10px;color:rgba(255,255,255,0.3);'
+    f'letter-spacing:3px;">SEZÓNA {vybrana_sezona}</div>'
+    '<div style="font-family:monospace;font-size:10px;color:#E8003D;'
+    'letter-spacing:3px;">xG · xA · HODNOTA</div>'
+    '</div></div>',
+    unsafe_allow_html=True
+)
+
+
+# ── FILTRY ────────────────────────────────────────────────────────────────────
+fc1, fc2, fc3 = st.columns([1, 1, 2])
+with fc1:
+    pos_filter = st.selectbox("POZICE", ["Všechny", "ÚTO", "ZÁL", "OBR"])
+with fc2:
+    min_mins = st.selectbox("MIN. MINUTY", [0, 300, 600, 900, 1200])
+with fc3:
+    scatter_mode = st.radio("ZOBRAZIT V GRAFU", ["Góly (xG)", "Asistence (xA)"], horizontal=True)
+
+filtered = df.copy()
+if pos_filter != "Všechny":
+    filtered = filtered[filtered["pos"] == pos_filter]
+filtered = filtered[filtered["mins"] >= min_mins]
+
+st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
+
+# ── TOP METRIKY ───────────────────────────────────────────────────────────────
+st.markdown(
+    '<div style="font-family:monospace;font-size:10px;letter-spacing:4px;'
+    'color:#4A7A60;margin-bottom:12px;">TOP HRÁČI</div>',
+    unsafe_allow_html=True
+)
+
+m1, m2, m3, m4 = st.columns(4)
+
+if not filtered.empty:
+    best_shooter = filtered.loc[filtered["xG_diff"].idxmax()]
+    m1.metric("Nejlepší střelec", best_shooter["name"].split()[-1],
+              "+" + str(best_shooter["xG_diff"]) + " nad xG")
+
+    best_assist = filtered.loc[filtered["xA_diff"].idxmax()]
+    m2.metric("Nejlepší asistent", best_assist["name"].split()[-1],
+              "+" + str(best_assist["xA_diff"]) + " nad xA")
+
+eff = filtered.dropna(subset=["eur_per_ga"])
+if not eff.empty:
+    best_val = eff.loc[eff["eur_per_ga"].idxmin()]
+    m3.metric("Nejlepší hodnota", best_val["name"].split()[-1],
+              fmt_eur(best_val["eur_per_ga"]) + " / G+A")
+
+fast = filtered.dropna(subset=["mins_per_ga"])
+if not fast.empty:
+    fastest = fast.loc[fast["mins_per_ga"].idxmin()]
+    m4.metric("Nejefektivnější", fastest["name"].split()[-1],
+              str(int(fastest["mins_per_ga"])) + " min / G+A")
+
+st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+
+# ── SCATTER ───────────────────────────────────────────────────────────────────
+st.markdown(
+    '<div style="font-family:monospace;font-size:10px;letter-spacing:4px;'
+    'color:#4A7A60;margin-bottom:16px;">SCATTER ANALÝZA</div>',
+    unsafe_allow_html=True
+)
+
+if scatter_mode == "Góly (xG)":
+    x_col, y_col = "xG", "goals"
+    x_lbl, y_lbl = "xG — očekávané góly", "Skutečné góly"
+else:
+    x_col, y_col = "xA", "assists"
+    x_lbl, y_lbl = "xA — očekávané asistence", "Skutečné asistence"
+
+scatter_df = filtered[filtered[x_col] > 0.3].copy()
+
+if not scatter_df.empty:
+    axis_max = max(scatter_df[x_col].max(), scatter_df[y_col].max()) * 1.2 + 0.5
+else:
+    axis_max = 5.0
+
+colors = []
+for _, row in scatter_df.iterrows():
+    diff = row[y_col] - row[x_col]
+    if diff > 0.5:
+        colors.append("#4ade80")
+    elif diff < -0.5:
+        colors.append("#f87171")
+    else:
+        colors.append("#facc15")
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=[0, axis_max], y=[0, axis_max], mode="lines",
+    line=dict(color="#1A3025", dash="dash", width=1),
+    showlegend=False, hoverinfo="skip"
+))
+fig.add_trace(go.Scatter(
+    x=scatter_df[x_col].tolist(),
+    y=scatter_df[y_col].tolist(),
+    mode="markers+text",
+    text=scatter_df["name"].str.split().str[-1].tolist(),
+    textposition="top center",
+    textfont=dict(size=10, color="rgba(245,245,240,0.6)", family="monospace"),
+    marker=dict(size=14, color=colors, line=dict(color="rgba(255,255,255,0.1)", width=1)),
+    customdata=scatter_df[["name", x_col, y_col]].values,
+    hovertemplate="<b>%{customdata[0]}</b><br>" + x_lbl + ": %{customdata[1]:.2f}<br>" + y_lbl + ": %{customdata[2]}<extra></extra>",
+))
+
+fig.update_layout(
+    paper_bgcolor="#0D1A12", plot_bgcolor="#0D1A12",
+    font=dict(color="#4A7A60", family="monospace"),
+    xaxis=dict(title=x_lbl, gridcolor="#1A3025", zeroline=False, range=[0, axis_max], color="#4A7A60"),
+    yaxis=dict(title=y_lbl, gridcolor="#1A3025", zeroline=False, range=[0, axis_max], color="#4A7A60"),
+    margin=dict(l=50, r=20, t=20, b=50),
+    height=400,
+    showlegend=False,
+    hoverlabel=dict(bgcolor="#0A3D2B", bordercolor="#E8003D", font=dict(family="monospace", size=12)),
+)
+st.plotly_chart(fig, use_container_width=True)
+
+lc1, lc2, lc3 = st.columns(3)
+lc1.markdown("<div style='font-size:12px;color:#4ade80;font-family:monospace'>● Překonává xG/xA</div>", unsafe_allow_html=True)
+lc2.markdown("<div style='font-size:12px;color:#facc15;font-family:monospace'>● Blízko očekávání</div>", unsafe_allow_html=True)
+lc3.markdown("<div style='font-size:12px;color:#f87171;font-family:monospace'>● Nedosahuje xG/xA</div>", unsafe_allow_html=True)
+
+st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+
+# ── TABULKA ───────────────────────────────────────────────────────────────────
+st.markdown(
+    '<div style="font-family:monospace;font-size:10px;letter-spacing:4px;'
+    'color:#4A7A60;margin-bottom:12px;">PŘEHLED HRÁČŮ</div>',
+    unsafe_allow_html=True
+)
+
+sort_options = {
+    "goals": "Góly", "xG": "xG", "xG_diff": "G – xG",
+    "assists": "Asistence", "xA": "xA", "xA_diff": "A – xA",
+    "tmValue": "Hodnota TM", "eur_per_goal": "€ / Gól",
+    "eur_per_assist": "€ / Asistence", "mins_per_ga": "Min / G+A"
 }
-STAT_COLS = ["mins", "goals", "xG", "assists", "xA", "body"]
+sort_col = st.selectbox("SEŘADIT PODLE", list(sort_options.keys()),
+                        format_func=lambda x: sort_options[x])
 
+asc = sort_col not in ["goals", "assists", "tmValue", "xG", "xA"]
+table_df = filtered.sort_values(sort_col, ascending=asc, na_position="last")
 
-def num(s):
-    s = (s or "").strip().replace("\xa0", "").replace(",", ".")
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+# Sestav HTML tabulku
+header_cols = ["HRÁČ", "POS", "G", "xG", "G–xG", "A", "xA", "A–xA", "MIN", "TM", "€/G", "€/A", "MIN/G+A"]
+th_style = "padding:10px 12px;text-align:left;font-family:monospace;font-size:10px;letter-spacing:2px;color:#4A7A60;white-space:nowrap;"
+header_html = "".join("<th style='" + th_style + "'>" + c + "</th>" for c in header_cols)
 
+rows_html = ""
+for _, row in table_df.iterrows():
+    xg_d = round(row["xG_diff"], 2)
+    xa_d = round(row["xA_diff"], 2)
+    xg_color = "#4ade80" if xg_d > 0 else "#f87171" if xg_d < 0 else "#facc15"
+    xa_color = "#4ade80" if xa_d > 0 else "#f87171" if xa_d < 0 else "#facc15"
+    xg_str = ("+" if xg_d > 0 else "") + str(xg_d)
+    xa_str = ("+" if xa_d > 0 else "") + str(xa_d)
 
-def scrape(season):
-    url = (f"https://www.chanceliga.cz/statistiky?unit=1&status=0&parameter=1"
-           f"&season={season}&club={CLUB_ID}&game_limit=0&nationality=&age=0"
-           f"&order=5&order_dir=2&list_number=0&position=0#stats")
-    with sync_playwright() as p:
-        b = p.chromium.launch(headless=True)
-        pg = b.new_page()
-        pg.goto(url, wait_until="networkidle", timeout=60000)
-        pg.wait_for_function(
-            "() => [...document.querySelectorAll('table th')]"
-            ".some(th => th.innerText.trim().toUpperCase() === 'XG')", timeout=60000)
-        data = pg.evaluate("""() => {
-            const t = [...document.querySelectorAll('table')].find(t =>
-                [...t.querySelectorAll('th')].some(th =>
-                    th.innerText.trim().toUpperCase() === 'XG'));
-            if (!t) return null;
-            return {
-              heads: [...t.querySelectorAll('th')].map(th => th.innerText.trim().toUpperCase()),
-              rows: [...t.querySelectorAll('tbody tr')].map(tr =>
-                    [...tr.querySelectorAll('td')].map(td => td.innerText.trim()))
-            };
-        }""")
-        b.close()
-    if not data:
-        sys.exit("CHYBA: tabulku se statistikou se nepodarilo najit.")
-    return data["heads"], data["rows"]
+    epg = fmt_eur(row["eur_per_goal"]) if pd.notna(row.get("eur_per_goal")) and row.get("eur_per_goal") else "–"
+    epa = fmt_eur(row["eur_per_assist"]) if pd.notna(row.get("eur_per_assist")) and row.get("eur_per_assist") else "–"
+    mpga = str(int(row["mins_per_ga"])) if pd.notna(row.get("mins_per_ga")) and row.get("mins_per_ga") else "–"
 
+    rows_html += (
+        "<tr>"
+        "<td style='font-weight:600;color:#F5F5F0;padding:9px 12px;border-bottom:1px solid #0D1A12;white-space:nowrap'>" + str(row["name"]) + "</td>"
+        "<td style='color:#4A7A60;font-family:monospace;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + str(row["pos"]) + "</td>"
+        "<td style='color:#F5F5F0;font-weight:700;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + str(row["goals"]) + "</td>"
+        "<td style='color:#888;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + str(round(row["xG"], 1)) + "</td>"
+        "<td style='color:" + xg_color + ";font-weight:700;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + xg_str + "</td>"
+        "<td style='color:#F5F5F0;font-weight:700;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + str(row["assists"]) + "</td>"
+        "<td style='color:#888;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + str(round(row["xA"], 1)) + "</td>"
+        "<td style='color:" + xa_color + ";font-weight:700;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + xa_str + "</td>"
+        "<td style='color:#888;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + str(row["mins"]) + "</td>"
+        "<td style='color:#E8003D;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + fmt_eur(row["tmValue"]) + "</td>"
+        "<td style='color:#F5F5F0;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + epg + "</td>"
+        "<td style='color:#F5F5F0;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + epa + "</td>"
+        "<td style='color:#F5F5F0;padding:9px 12px;border-bottom:1px solid #0D1A12'>" + mpga + "</td>"
+        "</tr>"
+    )
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--season", type=int, default=2027)
-    ap.add_argument("--round", type=int, default=0,
-                    help="cislo kola; 0 = odhadnout z max. poctu odehranych zapasu")
-    args = ap.parse_args()
+table_html = (
+    "<div style='overflow-x:auto;border-radius:12px;border:1px solid #1A3025;'>"
+    "<table style='width:100%;border-collapse:collapse;font-size:13px;font-family:Inter,sans-serif;'>"
+    "<thead><tr style='background:#0A3D2B;'>" + header_html + "</tr></thead>"
+    "<tbody>" + rows_html + "</tbody>"
+    "</table></div>"
+)
 
-    heads, rows = scrape(args.season)
-    idx = {h: i for i, h in enumerate(heads)}
-    need = ["HRÁČ", "PO", "Z", "MIN", "G", "XG", "A", "XA", "B"]
-    miss = [h for h in need if h not in idx]
-    if miss:
-        sys.exit(f"CHYBA: chybi sloupce {miss}. Hlavicka: {heads}")
+st.markdown(table_html, unsafe_allow_html=True)
 
-    scraped = {}
-    for r in rows:
-        name = r[idx["HRÁČ"]].strip()
-        if not name:
-            continue
-        scraped[name] = {
-            "po": r[idx["PO"]].strip(),
-            "games": int(num(r[idx["Z"]])),
-            "mins": int(num(r[idx["MIN"]])),
-            "goals": int(num(r[idx["G"]])),
-            "xG": round(num(r[idx["XG"]]), 2),
-            "assists": int(num(r[idx["A"]])),
-            "xA": round(num(r[idx["XA"]]), 2),
-            "body": round(num(r[idx["B"]]), 1),
-        }
+# ── FOOTER ────────────────────────────────────────────────────────────────────
+csv_path = Path(SEZONY[vybrana_sezona])
+updated = ""
+if csv_path.exists():
+    mtime = csv_path.stat().st_mtime
+    dt = datetime.fromtimestamp(mtime)
+    updated = "· Data: " + dt.strftime("%d. %m. %Y")
 
-    rnd = args.round or max((s["games"] for s in scraped.values()), default=1)
-
-    existing, order = {}, []
-    if CSV_PATH.exists():
-        for row in csv.DictReader(CSV_PATH.open(encoding="utf-8")):
-            existing[row["name"]] = row
-            order.append(row["name"])
-
-    out, new_players = [], []
-    for name in order:
-        base = existing[name]
-        s = scraped.get(name)
-        if s:
-            base.update(goals=str(s["goals"]), xG=f"{s['xG']:.2f}",
-                        assists=str(s["assists"]), xA=f"{s['xA']:.2f}",
-                        mins=str(s["mins"]))
-        out.append(base)
-    for name, s in scraped.items():
-        if name in existing:
-            continue
-        pos = POS_MAP.get(s["po"], POS_MAP.get(s["po"][:1], "ZÁL"))
-        if pos is None:
-            continue
-        out.append({"name": name, "pos": pos, "goals": str(s["goals"]),
-                    "xG": f"{s['xG']:.2f}", "assists": str(s["assists"]),
-                    "xA": f"{s['xA']:.2f}", "mins": str(s["mins"]), "tmValue": "0"})
-        new_players.append(name)
-
-    CSV_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with CSV_PATH.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=["name", "pos", "goals", "xG",
-                                          "assists", "xA", "mins", "tmValue"])
-        w.writeheader(); w.writerows(out)
-
-    # historie: snapshot za toto kolo (idempotentne)
-    hist_fields = ["round", "name", "pos"] + STAT_COLS
-    hist = []
-    if HIST_PATH.exists():
-        for row in csv.DictReader(HIST_PATH.open(encoding="utf-8")):
-            if int(row["round"]) != rnd:
-                hist.append(row)
-    for r in out:
-        s = scraped.get(r["name"], {})
-        hist.append({
-            "round": rnd, "name": r["name"], "pos": r["pos"],
-            "mins": r["mins"], "goals": r["goals"], "xG": r["xG"],
-            "assists": r["assists"], "xA": r["xA"],
-            "body": f"{s.get('body', 0):.1f}" if s else "0.0",
-        })
-    hist.sort(key=lambda x: (int(x["round"]), x["name"]))
-    with HIST_PATH.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=hist_fields)
-        w.writeheader(); w.writerows(hist)
-
-    print(f"\n[OK] {CSV_PATH} - {len(out)} hracu (aktualni stav)")
-    print(f"[OK] {HIST_PATH} - pridan snapshot pro KOLO {rnd}")
-    if new_players:
-        print("\nNovi hraci (dopln tmValue z Transfermarktu):")
-        for n in new_players:
-            print(f"  - {n}")
-    print("\nZkontroluj a commitni obe CSV.")
-
-
-if __name__ == "__main__":
-    main()
+st.markdown(
+    "<div style='text-align:center;margin-top:48px;padding:20px 0;border-top:1px solid #1A3025;'>"
+    "<div style='font-family:monospace;font-size:9px;letter-spacing:4px;color:#1A3025;'>"
+    "SEŠÍVANÍ SOBĚ " + updated + " · ZDROJ: CHANCELIGA.CZ &amp; TRANSFERMARKT"
+    "</div></div>",
+    unsafe_allow_html=True
+)
