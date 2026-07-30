@@ -165,13 +165,14 @@ st.markdown(
 
 m1, m2, m3, m4 = st.columns(4)
 
-best_shooter = filtered.loc[filtered["xG_diff"].idxmax()]
-m1.metric("Nejlepší střelec", best_shooter["name"].split()[-1],
-          "+" + str(best_shooter["xG_diff"]) + " nad xG")
+if not filtered.empty:
+    best_shooter = filtered.loc[filtered["xG_diff"].idxmax()]
+    m1.metric("Nejlepší střelec", best_shooter["name"].split()[-1],
+              "+" + str(best_shooter["xG_diff"]) + " nad xG")
 
-best_assist = filtered.loc[filtered["xA_diff"].idxmax()]
-m2.metric("Nejlepší asistent", best_assist["name"].split()[-1],
-          "+" + str(best_assist["xA_diff"]) + " nad xA")
+    best_assist = filtered.loc[filtered["xA_diff"].idxmax()]
+    m2.metric("Nejlepší asistent", best_assist["name"].split()[-1],
+              "+" + str(best_assist["xA_diff"]) + " nad xA")
 
 eff = filtered.dropna(subset=["eur_per_ga"])
 if not eff.empty:
